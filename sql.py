@@ -15,6 +15,19 @@ QUERY_TEMPLATES = {
         SELECT column_name, data_type, character_maximum_length
         FROM information_schema.columns
         WHERE table_name = '{table_name}';
+    """,
+    "Basic Stats": """
+        SELECT 
+            COUNT(*) as total_rows,
+            COUNT(DISTINCT {column_name}) as unique_values
+        FROM {table_name};
+    """,
+    "Latest Records": "SELECT * FROM {table_name} ORDER BY {date_column} DESC LIMIT 10;",
+    "Group By Count": """
+        SELECT {column_name}, COUNT(*) as count
+        FROM {table_name}
+        GROUP BY {column_name}
+        ORDER BY count DESC;
     """
 }
 
@@ -36,6 +49,9 @@ st.set_page_config(page_title="PostgreSQL Streamlit Interface", layout="wide")
 
 # Main app
 st.title("PostgreSQL Streamlit Interface")
+
+# Check if running on Streamlit Cloud
+IS_STREAMLIT_CLOUD = st.secrets._has_secrets()
 
 # Function to get available databases
 def get_databases(username, password, host, port):
@@ -166,42 +182,61 @@ def delete_query(name):
 with st.sidebar:
     st.header("Database Connection")
     
-    # Connection parameters
-    st.session_state.username = st.text_input("Username", "astraus")
-    st.session_state.password = st.text_input("Password", "", type="password")
-    st.session_state.host = st.text_input("Host", "localhost")
-    st.session_state.port = st.text_input("Port", "5432")
-    
-    # Get available databases button
-    if st.button("List Available Databases"):
-        databases = get_databases(
-            st.session_state.username,
-            st.session_state.password,
-            st.session_state.host,
-            st.session_state.port
-        )
-        if databases:
-            st.session_state['databases'] = databases
-            st.success("Retrieved database list!")
-    
-    # Database selection
-    if 'databases' in st.session_state:
-        st.session_state.db_name = st.selectbox(
-            "Select Database",
-            options=st.session_state['databases'],
-            index=st.session_state['databases'].index('ramp') if 'ramp' in st.session_state['databases'] else 0
-        )
+    if IS_STREAMLIT_CLOUD:
+        # Use secrets for cloud deployment
+        st.session_state.username = st.secrets.postgres.username
+        st.session_state.password = st.secrets.postgres.password
+        st.session_state.host = st.secrets.postgres.host
+        st.session_state.port = st.secrets.postgres.port
+        st.session_state.db_name = st.secrets.postgres.database
+        
+        st.info("Using cloud database configuration")
+        
+        if st.button("Connect"):
+            conn = create_connection()
+            if conn:
+                conn.close()
+                st.session_state.connected = True
+                st.success("Connected successfully!")
+            else:
+                st.session_state.connected = False
     else:
-        st.session_state.db_name = st.text_input("Database name", "ramp")
-
-    if st.button("Connect"):
-        conn = create_connection()
-        if conn:
-            conn.close()
-            st.session_state.connected = True
-            st.success("Connected successfully!")
+        # Local development settings
+        st.session_state.username = st.text_input("Username", "astraus")
+        st.session_state.password = st.text_input("Password", "", type="password")
+        st.session_state.host = st.text_input("Host", "localhost")
+        st.session_state.port = st.text_input("Port", "5432")
+        
+        # Get available databases button
+        if st.button("List Available Databases"):
+            databases = get_databases(
+                st.session_state.username,
+                st.session_state.password,
+                st.session_state.host,
+                st.session_state.port
+            )
+            if databases:
+                st.session_state['databases'] = databases
+                st.success("Retrieved database list!")
+        
+        # Database selection
+        if 'databases' in st.session_state:
+            st.session_state.db_name = st.selectbox(
+                "Select Database",
+                options=st.session_state['databases'],
+                index=st.session_state['databases'].index('ramp') if 'ramp' in st.session_state['databases'] else 0
+            )
         else:
-            st.session_state.connected = False
+            st.session_state.db_name = st.text_input("Database name", "ramp")
+
+        if st.button("Connect"):
+            conn = create_connection()
+            if conn:
+                conn.close()
+                st.session_state.connected = True
+                st.success("Connected successfully!")
+            else:
+                st.session_state.connected = False
     
     st.markdown("---")
     
