@@ -51,6 +51,8 @@ if 'query_history' not in st.session_state:
     st.session_state['query_history'] = []
 if 'current_schema' not in st.session_state:
     st.session_state['current_schema'] = None
+if 'db_connection_type' not in st.session_state:
+    st.session_state['db_connection_type'] = 'Local'
 
 # Page config
 st.set_page_config(page_title="PostgreSQL Streamlit Interface", layout="wide")
@@ -130,6 +132,18 @@ def get_schema_info(table_name):
 # Function to create database connection
 def create_connection():
     try:
+        # Cloud configuration
+        if st.session_state.db_connection_type == 'Cloud' and IS_STREAMLIT_CLOUD:
+            conn = psycopg2.connect(
+                dbname=st.secrets.postgres.database,
+                user=st.secrets.postgres.username,
+                password=st.secrets.postgres.password,
+                host=st.secrets.postgres.host,
+                port=st.secrets.postgres.port
+            )
+            return conn
+        
+        # Local configuration
         conn = psycopg2.connect(
             dbname=st.session_state.db_name,
             user=st.session_state.username,
@@ -190,15 +204,25 @@ def delete_query(name):
 with st.sidebar:
     st.header("Database Connection")
     
+    # Database Connection Type Selector
+    db_connection_options = ['Local']
     if IS_STREAMLIT_CLOUD:
-        # Use secrets for cloud deployment
-        st.session_state.username = st.secrets.postgres.username
-        st.session_state.password = st.secrets.postgres.password
-        st.session_state.host = st.secrets.postgres.host
-        st.session_state.port = st.secrets.postgres.port
-        st.session_state.db_name = st.secrets.postgres.database
-        
+        db_connection_options.append('Cloud')
+    
+    st.session_state.db_connection_type = st.selectbox(
+        "Connection Type", 
+        options=db_connection_options,
+        index=0 if 'Local' in db_connection_options else 1,
+        key="db_connection_type_selector"
+    )
+    
+    # Cloud Configuration
+    if st.session_state.db_connection_type == 'Cloud' and IS_STREAMLIT_CLOUD:
         st.info("Using cloud database configuration")
+        
+        # Display cloud connection details (without exposing sensitive info)
+        st.write(f"Database: {st.secrets.postgres.database}")
+        st.write(f"Host: {st.secrets.postgres.host}")
         
         if st.button("Connect"):
             conn = create_connection()
@@ -208,6 +232,8 @@ with st.sidebar:
                 st.success("Connected successfully!")
             else:
                 st.session_state.connected = False
+    
+    # Local Configuration
     else:
         # Local development settings
         st.session_state.username = st.text_input("Username", "astraus")
@@ -248,6 +274,7 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Rest of the sidebar remains the same (Query Management section)
     # Query Management section
     st.header("Query Management")
     
@@ -279,6 +306,8 @@ with st.sidebar:
         else:
             st.warning("Please provide both a name and a query")
 
+# Rest of the code remains the same as in the previous version
+# (Main content area, tabs, etc.)
 # Main content area
 if st.session_state.connected:
     # Create tabs for different sections
