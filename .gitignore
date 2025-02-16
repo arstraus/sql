@@ -19,3 +19,6 @@ saved_queries.json
 # Streamlit
 .streamlit/
 
+
+# Streamlit secrets
+.streamlit/

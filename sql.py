@@ -7,6 +7,14 @@ import json
 import os
 import time
 
+# Detect Streamlit Cloud environment
+def is_streamlit_cloud():
+    try:
+        # Check if Streamlit secrets are available
+        return st.secrets is not None
+    except Exception:
+        return False
+
 # Query templates
 QUERY_TEMPLATES = {
     "Count Records": "SELECT COUNT(*) FROM {table_name};",
@@ -51,7 +59,7 @@ st.set_page_config(page_title="PostgreSQL Streamlit Interface", layout="wide")
 st.title("PostgreSQL Streamlit Interface")
 
 # Check if running on Streamlit Cloud
-IS_STREAMLIT_CLOUD = st.secrets._has_secrets()
+IS_STREAMLIT_CLOUD = is_streamlit_cloud()
 
 # Function to get available databases
 def get_databases(username, password, host, port):
